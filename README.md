@@ -1,2 +1,3 @@
 # promise
-javascript promise implementation with the Promises/A+ specification
+A javascript promise implementation with the [Promises/A+ specification](https://github.com/promises-aplus/promises-spec)
+
