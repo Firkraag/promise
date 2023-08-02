@@ -1,0 +1,14 @@
+{
+  "name": "promise",
+  "version": "1.0.0",
+  "main": "promise.js",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "promises-aplus-tests": "*"
+  },
+  "scripts": {
+    "test": "promises-aplus-tests promise.js"
+  }
+}
