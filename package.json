@@ -6,6 +6,7 @@
     "node": ">=14.0.0"
   },
   "devDependencies": {
+    "eslint": "^8.47.0",
     "promises-aplus-tests": "*"
   },
   "scripts": {
