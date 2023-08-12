@@ -17,6 +17,80 @@ class Promise {
       this.#reject(error);
     }
   }
+  static resolve(value) {
+    return new Promise(resolve => resolve(value));
+  }
+  static reject(reason) {
+    return new Promise((_resolve, reject) => reject(reason));
+  }
+  static race(promises) {
+    return new Promise((resolve, reject) => {
+      for (const promise of promises) {
+        if (promise instanceof Promise) {
+          promise.then(resolve, reject);
+        } else {
+          resolve(promise);
+        }
+      }
+    });
+  }
+  static allSettled(promises) {
+    return new Promise((resolve) => {
+      const result = [];
+      let count = 0;
+      let size = 0;
+      for (const promise of promises) {
+        if (!(promise instanceof Promise)) {
+          result[size++] = { status: 'fulfilled', value: promise };
+          count++;
+        }
+        else {
+          const index = size++;
+          promise.then((data) => {
+            result[index] = { status: 'fulfilled', value: data }
+            if (++count === size) {
+              resolve(result)
+            }
+          }, (reason) => {
+            result[index] = { status: 'rejected', reason: reason }
+            if (++count === size) {
+              resolve(result)
+            }
+          });
+        }
+      }
+      if (size === count) {
+        resolve(result);
+      }
+    });
+  }
+  static all(promises) {
+    return new Promise((resolve, reject) => {
+      const result = []
+      let count = 0
+      let size = 0
+      for (const promise of promises) {
+        if (!(promise instanceof Promise)) {
+          result[size++] = promise;
+          count++;
+        }
+        else {
+          const index = size++
+          promise.then((data) => {
+            result[index] = data
+            if (++count === size) {
+              resolve(result)
+            }
+          }, (error) => {
+            reject(error)
+          });
+        }
+      }
+      if (size === count) {
+        resolve(result);
+      }
+    })
+  }
   then(onFulfilled, onRejected) {
     onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : v => v;
     onRejected = typeof onRejected === 'function' ? onRejected : r => { throw r };
@@ -42,27 +116,54 @@ class Promise {
   catch(onRejected) {
     return this.then(undefined, onRejected);
   }
+  finally(onFinally) {
+    return new Promise((resolve, reject) => {
+      this.then(value => {
+        try {
+          const v = onFinally();
+          if (v instanceof Promise) {
+            v.then(() => resolve(value), reason => reject(reason));
+          } else {
+            resolve(value);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      }, reason => {
+        try {
+          const v = onFinally();
+          if (v instanceof Promise) {
+            v.then(() => reject(reason), r => reject(r));
+          } else {
+            reject(reason);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+  }
   #resolve(data) {
-    if (this.#state === State.PENDING) {
-      setTimeout(() => {
+    setTimeout(() => {
+      if (this.#state === State.PENDING) {
         this.#state = State.FULFILLED;
         this.#data = data;
         for (const callback of this.#onResolvedCallbacks) {
           callback(data);
         }
-      }, 0);
-    }
+      }
+    }, 0);
   }
   #reject(reason) {
-    if (this.#state === State.PENDING) {
-      setTimeout(() => {
+    setTimeout(() => {
+      if (this.#state === State.PENDING) {
         this.#state = State.REJECTED;
         this.#reason = reason;
         for (const callback of this.#onRejectedCallbacks) {
           callback(reason);
         }
-      }, 0);
-    }
+      }
+    }, 0);
   }
   #resolvePromise(x) {
     if (x === this) {
