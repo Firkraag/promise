@@ -2,23 +2,26 @@ const State = {
   PENDING: 0,
   FULFILLED: 1,
   REJECTED: 2,
-}
+};
 class Promise {
-  #state = State.PENDING
-  #data = undefined
-  #reason = undefined
-  #onResolvedCallbacks = []
-  #onRejectedCallbacks = []
+  #state = State.PENDING;
+  #data = undefined;
+  #reason = undefined;
+  #onResolvedCallbacks = [];
+  #onRejectedCallbacks = [];
 
   constructor(executor) {
     try {
-      executor(data => this.#resolvePromise(data), reason => this.#reject(reason));
+      executor(
+        (data) => this.#resolvePromise(data),
+        (reason) => this.#reject(reason),
+      );
     } catch (error) {
       this.#reject(error);
     }
   }
   static resolve(value) {
-    return new Promise(resolve => resolve(value));
+    return new Promise((resolve) => resolve(value));
   }
   static reject(reason) {
     return new Promise((_resolve, reject) => reject(reason));
@@ -41,22 +44,24 @@ class Promise {
       let size = 0;
       for (const promise of promises) {
         if (!(promise instanceof Promise)) {
-          result[size++] = { status: 'fulfilled', value: promise };
+          result[size++] = { status: "fulfilled", value: promise };
           count++;
-        }
-        else {
+        } else {
           const index = size++;
-          promise.then((data) => {
-            result[index] = { status: 'fulfilled', value: data }
-            if (++count === size) {
-              resolve(result)
-            }
-          }, (reason) => {
-            result[index] = { status: 'rejected', reason: reason }
-            if (++count === size) {
-              resolve(result)
-            }
-          });
+          promise.then(
+            (data) => {
+              result[index] = { status: "fulfilled", value: data };
+              if (++count === size) {
+                resolve(result);
+              }
+            },
+            (reason) => {
+              result[index] = { status: "rejected", reason: reason };
+              if (++count === size) {
+                resolve(result);
+              }
+            },
+          );
         }
       }
       if (size === count) {
@@ -66,36 +71,43 @@ class Promise {
   }
   static all(promises) {
     return new Promise((resolve, reject) => {
-      const result = []
-      let count = 0
-      let size = 0
+      const result = [];
+      let count = 0;
+      let size = 0;
       for (const promise of promises) {
         if (!(promise instanceof Promise)) {
           result[size++] = promise;
           count++;
-        }
-        else {
-          const index = size++
-          promise.then((data) => {
-            result[index] = data
-            if (++count === size) {
-              resolve(result)
-            }
-          }, (error) => {
-            reject(error)
-          });
+        } else {
+          const index = size++;
+          promise.then(
+            (data) => {
+              result[index] = data;
+              if (++count === size) {
+                resolve(result);
+              }
+            },
+            (error) => {
+              reject(error);
+            },
+          );
         }
       }
       if (size === count) {
         resolve(result);
       }
-    })
+    });
   }
   then(onFulfilled, onRejected) {
-    onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : v => v;
-    onRejected = typeof onRejected === 'function' ? onRejected : r => { throw r };
+    onFulfilled = typeof onFulfilled === "function" ? onFulfilled : (v) => v;
+    onRejected =
+      typeof onRejected === "function"
+        ? onRejected
+        : (r) => {
+            throw r;
+          };
     return new Promise((resolve, reject) => {
-      this.#onResolvedCallbacks.push(value => {
+      this.#onResolvedCallbacks.push((value) => {
         try {
           const x = onFulfilled(value);
           resolve(x);
@@ -103,7 +115,7 @@ class Promise {
           reject(error);
         }
       });
-      this.#onRejectedCallbacks.push(reason => {
+      this.#onRejectedCallbacks.push((reason) => {
         try {
           const x = onRejected(reason);
           resolve(x);
@@ -118,29 +130,38 @@ class Promise {
   }
   finally(onFinally) {
     return new Promise((resolve, reject) => {
-      this.then(value => {
-        try {
-          const v = onFinally();
-          if (v instanceof Promise) {
-            v.then(() => resolve(value), reason => reject(reason));
-          } else {
-            resolve(value);
+      this.then(
+        (value) => {
+          try {
+            const v = onFinally();
+            if (v instanceof Promise) {
+              v.then(
+                () => resolve(value),
+                (reason) => reject(reason),
+              );
+            } else {
+              resolve(value);
+            }
+          } catch (error) {
+            reject(error);
           }
-        } catch (error) {
-          reject(error);
-        }
-      }, reason => {
-        try {
-          const v = onFinally();
-          if (v instanceof Promise) {
-            v.then(() => reject(reason), r => reject(r));
-          } else {
-            reject(reason);
+        },
+        (reason) => {
+          try {
+            const v = onFinally();
+            if (v instanceof Promise) {
+              v.then(
+                () => reject(reason),
+                (r) => reject(r),
+              );
+            } else {
+              reject(reason);
+            }
+          } catch (error) {
+            reject(error);
           }
-        } catch (error) {
-          reject(error);
-        }
-      });
+        },
+      );
     });
   }
   #resolve(data) {
@@ -167,21 +188,20 @@ class Promise {
   }
   #resolvePromise(x) {
     if (x === this) {
-      this.#reject(new TypeError('Chaining cycle detected for promise!'));
-    }
-    else if (x instanceof Promise) {
+      this.#reject(new TypeError("Chaining cycle detected for promise!"));
+    } else if (x instanceof Promise) {
       if (x.#state === State.PENDING) {
-        x.#onResolvedCallbacks.push(value => this.#resolvePromise(value));
-        x.#onRejectedCallbacks.push(reason => this.#reject(reason));
-      }
-      else if (x.#state == State.FULFILLED) {
+        x.#onResolvedCallbacks.push((value) => this.#resolvePromise(value));
+        x.#onRejectedCallbacks.push((reason) => this.#reject(reason));
+      } else if (x.#state == State.FULFILLED) {
         this.#resolve(x.#data);
-      }
-      else {
+      } else {
         this.#reject(x.#reason);
       }
-    }
-    else if ((x !== null) && ((typeof x === 'object') || (typeof x === 'function'))) {
+    } else if (
+      x !== null &&
+      (typeof x === "object" || typeof x === "function")
+    ) {
       let then = undefined;
       try {
         then = x.then;
@@ -189,34 +209,36 @@ class Promise {
         this.#reject(error);
         return;
       }
-      if (typeof then === 'function') {
+      if (typeof then === "function") {
         let called = false;
         try {
-          then.call(x, y => {
-            if (called) return;
-            called = true;
-            this.#resolvePromise(y);
-          }, r => {
-            if (called) return;
-            called = true;
-            this.#reject(r);
-          });
+          then.call(
+            x,
+            (y) => {
+              if (called) return;
+              called = true;
+              this.#resolvePromise(y);
+            },
+            (r) => {
+              if (called) return;
+              called = true;
+              this.#reject(r);
+            },
+          );
         } catch (error) {
           if (called) return;
           this.#reject(error);
         }
-      }
-      else {
+      } else {
         this.#resolve(x);
       }
-    }
-    else {
+    } else {
       this.#resolve(x);
     }
   }
 }
 function resolved(value) {
-  return new Promise(resolve => resolve(value));
+  return new Promise((resolve) => resolve(value));
 }
 function rejected(reason) {
   return new Promise((_resolve, reject) => reject(reason));
@@ -226,9 +248,11 @@ function deferred() {
   deferred.promise = new Promise((resolve, reject) => {
     deferred.resolve = resolve;
     deferred.reject = reject;
-  })
+  });
   return deferred;
 }
 module.exports = {
-  resolved, rejected, deferred
-}
+  resolved,
+  rejected,
+  deferred,
+};
