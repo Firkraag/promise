@@ -1,14 +1,14 @@
 {
   "name": "promise",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "promise.js",
   "engines": {
     "node": ">=14.0.0"
   },
   "devDependencies": {
-    "eslint": "^8.47.0",
-    "prettier": "3.0.1",
-    "promises-aplus-tests": "*"
+    "eslint": "^8.48.0",
+    "prettier": "^3.0.2",
+    "promises-aplus-tests": "^2.1.2"
   },
   "scripts": {
     "test": "promises-aplus-tests promise.js"
