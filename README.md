@@ -1,3 +1,4 @@
+![example workflow](https://github.com/Firkraag/promise/actions/workflows/node.js.yml/badge.svg)
 # promise
 A javascript promise implementation with the [Promises/A+ specification](https://github.com/promises-aplus/promises-spec)
 <a href="https://promisesaplus.com/">
