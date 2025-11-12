@@ -49,7 +49,6 @@ class Promise {
         value?: unknown,
         reason?: unknown,
       }
-      let abc: 'a' | 'b' = 'a';
       const result: Result[] = [];
       let count = 0;
       let size = 0;
