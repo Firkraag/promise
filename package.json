@@ -11,6 +11,6 @@
     "promises-aplus-tests-refreshed": "^2.3.3"
   },
   "scripts": {
-    "test": "promises-aplus-tests-refreshed promise.js"
+    "test": "tsc --strict -t esnext promise.ts && promises-aplus-tests-refreshed promise.js"
   }
 }
