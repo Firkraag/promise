@@ -13,7 +13,7 @@ const State = {
   REJECTED: 2,
 };
 
-class Promise<T = unknown> {
+clas Promise<T = unknown> {
   #state: number = State.PENDING;
   #data: T | undefined = undefined;
   #reason: unknown = undefined;
