@@ -1,123 +1,111 @@
-type FuncType = (value: unknown) => unknown;
+type ResolveFn<T> = (value: T | PromiseLike<T>) => void;
+type RejectFn = (reason?: unknown) => void;
+type Executor<T> = (resolveFunc: ResolveFn<T>, rejectFunc: RejectFn) => unknown;
+type OnFulfilled<T, R> = (value: T) => R | PromiseLike<R>;
+type OnFulfilledOrNull<T, R> = OnFulfilled<T, R> | null | undefined;
+type OnRejected<R> = (reason: unknown) => R | PromiseLike<R>;
+type OnRejectedOrNull<R> = OnRejected<R> | null | undefined;
+type FinallyHandler = () => unknown;
 
 const State = {
   PENDING: 0,
   FULFILLED: 1,
   REJECTED: 2,
 };
-class Promise {
-  #state: number = State.PENDING;
-  #data: unknown = undefined;
-  #reason: unknown = undefined;
-  #onResolvedCallbacks: FuncType[]= [];
-  #onRejectedCallbacks: FuncType[] = [];
 
-  constructor(executor: (
-        resolveFunc: FuncType,
-        rejectFunc: FuncType,
-  ) => unknown) {
+class Promise<T = unknown> {
+  #state: number = State.PENDING;
+  #data: T | undefined = undefined;
+  #reason: unknown = undefined;
+  #onResolvedCallbacks: Array<(value: T) => void> = [];
+  #onRejectedCallbacks: Array<(reason: unknown) => void> = [];
+
+  constructor(executor: Executor<T>) {
     try {
       executor(
-        (data ) => this.#resolvePromise(data),
+        (data) => this.#resolvePromise(data),
         (reason) => this.#reject(reason),
       );
     } catch (error) {
       this.#reject(error);
     }
   }
-  static resolve(value: unknown) {
-    return new Promise((resolve) => resolve(value));
+  static resolve<T>(value: T | PromiseLike<T>) {
+    return new Promise<T>((resolve) => resolve(value));
   }
   static reject(reason: unknown) {
-    return new Promise((_resolve, reject) => reject(reason));
+    return new Promise<never>((_resolve, reject) => reject(reason));
   }
-  static race(promises: Iterable<unknown>) {
-    return new Promise((resolve, reject) => {
+  static race<T>(promises: Iterable<T | PromiseLike<T>>) {
+    return new Promise<T>((resolve, reject) => {
       for (const promise of promises) {
-        if (promise instanceof Promise) {
-          promise.then(resolve, reject);
-        } else {
-          resolve(promise);
-        }
+        Promise.resolve(promise).then(resolve, reject);
       }
     });
   }
-  static allSettled(promises: Iterable<unknown>) {
-    return new Promise((resolve) => {
-      type Result = {
-        status: 'fulfilled' | 'rejected',
-        value?: unknown,
-        reason?: unknown,
-      }
-      const result: Result[] = [];
+  static allSettled<T>(promises: Iterable<T | PromiseLike<T>>) {
+    return new Promise<Array<PromiseSettledResult<T>>>((resolve) => {
+      const result: Array<PromiseSettledResult<T>> = [];
       let count = 0;
       let size = 0;
       for (const promise of promises) {
-        if (!(promise instanceof Promise)) {
-          result[size++] = { status: "fulfilled", value: promise };
-          count++;
-        } else {
-          const index = size++;
-          promise.then(
-            (data: unknown) => {
-              result[index] = { status: "fulfilled", value: data };
-              if (++count === size) {
-                resolve(result);
-              }
-            },
-            (reason: unknown) => {
-              result[index] = { status: "rejected", reason: reason };
-              if (++count === size) {
-                resolve(result);
-              }
-            },
-          );
-        }
+        const index = size++;
+        Promise.resolve(promise).then(
+          (data: T) => {
+            result[index] = { status: "fulfilled", value: data };
+            if (++count === size) {
+              resolve(result);
+            }
+          },
+          (reason: unknown) => {
+            result[index] = { status: "rejected", reason };
+            if (++count === size) {
+              resolve(result);
+            }
+          },
+        );
       }
       if (size === count) {
         resolve(result);
       }
     });
   }
-  static all(promises: Iterable<unknown>) {
-    return new Promise((resolve, reject) => {
-      const result: unknown[] = [];
+  static all<T>(promises: Iterable<T | PromiseLike<T>>) {
+    return new Promise<T[]>((resolve, reject) => {
+      const result: T[] = [];
       let count = 0;
       let size = 0;
       for (const promise of promises) {
-        if (!(promise instanceof Promise)) {
-          result[size++] = promise;
-          count++;
-        } else {
-          const index = size++;
-          promise.then(
-            (data: unknown) => {
-              result[index] = data;
-              if (++count === size) {
-                resolve(result);
-              }
-            },
-            (error: unknown) => {
-              reject(error);
-            },
-          );
-        }
+        const index = size++;
+        Promise.resolve(promise).then(
+          (data: T) => {
+            result[index] = data;
+            if (++count === size) {
+              resolve(result);
+            }
+          },
+          (error: unknown) => reject(error),
+        );
       }
       if (size === count) {
         resolve(result);
       }
     });
   }
-  then(onFulfilled: unknown, onRejected: unknown) {
-    const onFulfilledFunc: FuncType = typeof onFulfilled === "function" ? onFulfilled as FuncType : (v) => v;
+  then<TResult1 = T, TResult2 = never>(
+    onFulfilled?: OnFulfilledOrNull<T, TResult1>,
+    onRejected?: OnRejectedOrNull<TResult2>,
+  ) {
+    const onFulfilledFunc: OnFulfilled<T, TResult1> =
+      typeof onFulfilled === "function" ? onFulfilled : (v) => v as unknown as TResult1;
 
-    const onRejectedFunc: FuncType =
+    const onRejectedFunc: OnRejected<TResult2> =
       typeof onRejected === "function"
-        ? onRejected as FuncType
+        ? onRejected
         : (r) => {
             throw r;
           };
-    return new Promise((resolve, reject) => {
+    return new Promise<TResult1 | TResult2>((resolve, reject) => {
       this.#onResolvedCallbacks.push((value) => {
         try {
           const x = onFulfilledFunc(value);
@@ -136,19 +124,19 @@ class Promise {
       });
     });
   }
-  catch(onRejected: unknown) {
+  catch<TResult = never>(onRejected?: OnRejectedOrNull<TResult>) {
     return this.then(undefined, onRejected);
   }
-  finally(onFinally: () => unknown) {
-    return new Promise((resolve, reject) => {
+  finally(onFinally: FinallyHandler) {
+    return new Promise<T>((resolve, reject) => {
       this.then(
-        (value: unknown) => {
+        (value: T) => {
           try {
             const v = onFinally();
             if (v instanceof Promise) {
               v.then(
                 () => resolve(value),
-                (reason: unknown) => reject(reason),
+                (reason) => reject(reason),
               );
             } else {
               resolve(value);
@@ -163,7 +151,7 @@ class Promise {
             if (v instanceof Promise) {
               v.then(
                 () => reject(reason),
-                (r: unknown) => reject(r),
+                (r) => reject(r),
               );
             } else {
               reject(reason);
@@ -175,7 +163,7 @@ class Promise {
       );
     });
   }
-  #resolve(data: unknown) {
+  #resolve(data: T) {
     setTimeout(() => {
       if (this.#state === State.PENDING) {
         this.#state = State.FULFILLED;
@@ -197,7 +185,7 @@ class Promise {
       }
     }, 0);
   }
-  #resolvePromise(x: unknown) {
+  #resolvePromise(x: T | PromiseLike<T> | Promise<T> | unknown) {
     if (x === this) {
       this.#reject(new TypeError("Chaining cycle detected for promise!"));
     } else if (x instanceof Promise) {
@@ -205,7 +193,7 @@ class Promise {
         x.#onResolvedCallbacks.push((value) => this.#resolvePromise(value));
         x.#onRejectedCallbacks.push((reason) => this.#reject(reason));
       } else if (x.#state == State.FULFILLED) {
-        this.#resolve(x.#data);
+        this.#resolve(x.#data as T);
       } else {
         this.#reject(x.#reason);
       }
@@ -228,7 +216,7 @@ class Promise {
             (y: unknown) => {
               if (called) return;
               called = true;
-              this.#resolvePromise(y);
+              this.#resolvePromise(y as T);
             },
             (r: unknown) => {
               if (called) return;
@@ -241,30 +229,34 @@ class Promise {
           this.#reject(error);
         }
       } else {
-        this.#resolve(x);
+        this.#resolve(x as T);
       }
     } else {
-      this.#resolve(x);
+      this.#resolve(x as T);
     }
   }
 }
-function resolved(value: unknown) {
-  return new Promise((resolve) => resolve(value));
+function resolved<T>(value: T) {
+  return new Promise<T>((resolve) => resolve(value));
 }
 function rejected(reason: unknown) {
-  return new Promise((_resolve, reject) => reject(reason));
+  return new Promise<never>((_resolve, reject) => reject(reason));
 }
-function deferred() {
+function deferred<T>() {
   const deferred: {
-    promise?: Promise;
-    resolve?: FuncType;
-    reject?: FuncType;
+    promise?: Promise<T>;
+    resolve?: ResolveFn<T>;
+    reject?: RejectFn;
   } = {};
-  deferred.promise = new Promise((resolve, reject) => {
+  deferred.promise = new Promise<T>((resolve, reject) => {
     deferred.resolve = resolve;
     deferred.reject = reject;
   });
-  return deferred;
+  return deferred as {
+    promise: Promise<T>;
+    resolve: ResolveFn<T>;
+    reject: RejectFn;
+  };
 }
 export {
   resolved,
